@@ -1,0 +1,6 @@
+{
+  "name": "Wayfinder AI",
+  "description": "Assistente especialista em planejamento de viagens e inteligência meteorológica com dados em tempo real, dicas de mala e roteiros sob medida.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
