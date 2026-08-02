@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Helper to format WMO weather code to Portuguese description & emoji icon
 function getWeatherCondition(code: number): { text: string; icon: string } {
@@ -63,11 +63,15 @@ function getWeatherCondition(code: number): { text: string; icon: string } {
   }
 }
 
-// Function 1: obter_coordenadas
+// Function 1: obter_coordenadas (com User-Agent adicionado)
 async function obter_coordenadas(cidade: string) {
   try {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidade)}&count=5&language=pt&format=json`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "WayfinderAI-App/1.0 (https://wayfinder-ai.onrender.com)"
+      }
+    });
     if (!res.ok) {
       throw new Error(`Erro de geocodificação: ${res.statusText}`);
     }
@@ -96,11 +100,15 @@ async function obter_coordenadas(cidade: string) {
   }
 }
 
-// Function 2: obter_previsao_tempo
+// Function 2: obter_previsao_tempo (com User-Agent adicionado)
 async function obter_previsao_tempo(latitude: number, longitude: number) {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,uv_index_max&timezone=auto`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "WayfinderAI-App/1.0 (https://wayfinder-ai.onrender.com)"
+      }
+    });
     if (!res.ok) {
       throw new Error(`Erro ao obter previsão do tempo: ${res.statusText}`);
     }
@@ -228,19 +236,16 @@ app.post("/api/plan-trip", async (req, res) => {
       return res.status(400).json({ error: "Por favor informe a cidade desejada." });
     }
 
-    // 1. obter_coordenadas
     const coordResult = await obter_coordenadas(city);
     if ("error" in coordResult) {
       return res.status(404).json({ error: coordResult.error });
     }
 
-    // 2. obter_previsao_tempo
     const weatherResult = await obter_previsao_tempo(coordResult.latitude, coordResult.longitude);
     if ("error" in weatherResult) {
       return res.status(500).json({ error: weatherResult.error });
     }
 
-    // 3. Generate tailored trip plan JSON using Gemini
     const ai = getGeminiClient();
     const prompt = `Você é o Wayfinder AI, especialista em viagens e inteligência meteorológica.
 Analise estes dados meteorológicos REAIS para ${coordResult.cidade}, ${coordResult.pais}:
@@ -274,7 +279,7 @@ Gere um objeto JSON estruturado contendo:
 Retorne APENAS o JSON válido sem marcações markdown de código e sem texto extra.`;
 
     const aiRes = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -369,21 +374,17 @@ FLUXO OBRIGATÓRIO RIGOROSO:
    - 🎒 Dicas de Mala: O que levar especificamente ajustado ao clima retornado (ex: casaco pesado se frio, guarda-chuva se chuva/garoa, protetor solar e chapéu se ensolarado, calçados fechados ou abertos).
    - 🗺️ Roteiro Sugerido: Exactamente 3 atividades recomendadas adaptadas ao clima real (ex: se chovendo ou frio, priorize museus, cafés, centros culturais e gastronomia coberta; se ensolarado/agradável, priorize parques, praias, passeios ao ar livre e mirantes).
 
-Mantenha um tom amigável, organizado, prático e motivador em português do Brasil.`;
+Mantenha um tom amigável, organized, prático e motivador em português do Brasil.`;
 
-    // Convert chat history to contents format for Gemini
-    // We can run a function calling step loop server-side
     const functionCallsLog: Array<{ functionName: string; args: any; result: any }> = [];
 
-    // Construct conversation contents
     const contentsHistory: any[] = messages.map((m: any) => ({
       role: m.sender === 'user' ? 'user' : 'model',
       parts: [{ text: m.text }]
     }));
 
-    // Step 1: Initial call with tools
     let currentResponse = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.0-flash",
       contents: contentsHistory,
       config: {
         systemInstruction,
@@ -391,7 +392,6 @@ Mantenha um tom amigável, organizado, prático e motivador em português do Bra
       }
     });
 
-    // Function Execution Loop (Up to 4 iterations)
     let maxLoop = 4;
     while (maxLoop > 0 && currentResponse.functionCalls && currentResponse.functionCalls.length > 0) {
       maxLoop--;
@@ -412,7 +412,6 @@ Mantenha um tom amigável, organizado, prático e motivador em português do Bra
         result: fnResult
       });
 
-      // Prepare conversation history with function call & function response
       const modelContent = currentResponse.candidates?.[0]?.content;
 
       const functionResponsePart = {
@@ -429,7 +428,7 @@ Mantenha um tom amigável, organizado, prático e motivador em português do Bra
       });
 
       currentResponse = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.0-flash",
         contents: contentsHistory,
         config: {
           systemInstruction,
