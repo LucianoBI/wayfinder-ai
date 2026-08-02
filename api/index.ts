@@ -273,7 +273,7 @@ Gere um objeto JSON estruturado contendo:
 Retorne APENAS o JSON válido sem marcações markdown de código e sem texto extra.`;
 
     const aiRes = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -382,7 +382,7 @@ Mantenha um tom amigável, organizado, prático e motivador em português do Bra
 
     // Step 1: Initial call with tools
     let currentResponse = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: contentsHistory,
       config: {
         systemInstruction,
@@ -428,7 +428,7 @@ Mantenha um tom amigável, organizado, prático e motivador em português do Bra
       });
 
       currentResponse = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         contents: contentsHistory,
         config: {
           systemInstruction,
